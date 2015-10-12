@@ -299,9 +299,25 @@ public abstract class OLuceneIndexEngineAbstract<V> extends OSharedResourceAdapt
     try {
 
       final Class classAnalyzer = Class.forName(analyzerFQN);
-      final Constructor constructor = classAnalyzer.getConstructor();
 
-      return (Analyzer) constructor.newInstance();
+      CharArraySet stopwords = (CharArraySet) classAnalyzer.getMethod("getDefaultStopSet").invoke(null);
+      if (metadata.field("stopwords") != null) {
+        Collection myStopwords = new HashSet((Collection) metadata.field("stopwords"));
+        Object mergeDefaultStopwords = metadata.field("mergeDefaultStopwords");
+        if ((mergeDefaultStopwords instanceof Boolean) && ((Boolean) mergeDefaultStopwords == true)) {
+          myStopwords.addAll(stopwords);
+        }
+        stopwords = new CharArraySet(version, myStopwords, true);
+      }
+
+      CharArraySet stemExclude = CharArraySet.EMPTY_SET;
+      if (metadata.field("stemExclude") != null) {
+        stemExclude = new CharArraySet(version, (Collection) metadata.field("stemExclude"), true);
+      }
+
+      final Constructor constructor = classAnalyzer.getConstructor(Version.class, CharArraySet.class, CharArraySet.class);
+
+      return (Analyzer) constructor.newInstance(version, stopwords, stemExclude);
     } catch (ClassNotFoundException e) {
       throw OException.wrapException(new OIndexException("Analyzer: " + analyzerFQN + " not found"), e);
     } catch (NoSuchMethodException e) {
